@@ -1,6 +1,8 @@
 package app.parser.interpreters;
 
-public abstract class Primitive implements Interpreter {
+import java.io.Serializable;
+
+public abstract class Primitive implements Interpreter, Serializable {
 
     public boolean printValue = true;
 

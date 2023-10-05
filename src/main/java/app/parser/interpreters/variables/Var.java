@@ -17,9 +17,10 @@ public class Var implements Interpreter {
     /* Base Methods */
 
     public Primitive solve() {
-        if (!SessionHandler.varExists(token, name))
+        Primitive p = SessionHandler.getVar(token, name);
+        if (p == null)
             return new Err("variable '" + name + "' does not exist");
 
-        return SessionHandler.getVar(token, name);
+        return p;
     }
 }

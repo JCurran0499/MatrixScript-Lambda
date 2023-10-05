@@ -1,0 +1,291 @@
+AWSTemplateFormatVersion : "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: This is a CloudFormation SAM template for deploying MatrixScript
+
+
+Mappings:
+  IAM:
+    Role:
+      Name: Lambda-matrixscript
+      Auth: Lambda-matrixscript-auth
+
+  Lambda:
+    Function:
+      Name: MatrixScript
+      Auth: MatrixScript-Auth
+
+  APIGateway:
+    API:
+      Name: MatrixScript
+      Domain: serverless.api.matrixscript.net
+      Origins:
+        - "*"
+      Auth: auth
+
+    HostedZone:
+      Id: Z05353691HE8L4XSDSLON
+
+  DynamoDB:
+    Table:
+      Name: MatrixScript-Sessions
+      PrimaryKey: SessionToken
+
+
+Resources:
+  # IAM
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+      RoleName: !FindInMap [IAM, Role, Name]
+
+  AuthorizerExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMFullAccess
+      RoleName: !FindInMap [ IAM, Role, Auth ]
+
+
+  # Lambda
+  MatrixScriptLambda:
+    Type: AWS::Serverless::Function
+    DependsOn: LambdaExecutionRole
+    Properties:
+      Architectures:
+        - x86_64
+      CodeUri: target/MatrixScript-2.0-jar-with-dependencies.jar
+      FunctionName: !FindInMap [Lambda, Function, Name]
+      Handler: app.MatrixScript::handleRequest
+      MemorySize: 2048
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Runtime: java17
+      SnapStart:
+        ApplyOn: PublishedVersions
+      Timeout: 900
+
+  AuthorizerLambda:
+    Type: AWS::Serverless::Function
+    DependsOn: AuthorizerExecutionRole
+    Properties:
+      Architectures:
+        - x86_64
+      CodeUri: authorizer/authorizer.zip
+      FunctionName: !FindInMap [Lambda, Function, Auth]
+      Handler: authorizer.handler
+      Role: !GetAtt AuthorizerExecutionRole.Arn
+      Runtime: nodejs18.x
+      Timeout: 5
+
+  LambdaAPIPermissions:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - MatrixScriptLambda
+      - MatrixScriptAPI
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !FindInMap [Lambda, Function, Name]
+      Principal: apigateway.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref AWS::Partition
+          - ":execute-api:"
+          - !Ref AWS::Region
+          - ":"
+          - !Ref AWS::AccountId
+          - ":"
+          - !Ref MatrixScriptAPI
+          - "/*/*/*"
+
+  AuthorizerAPIPermissions:
+    Type: AWS::Lambda::Permission
+    DependsOn:
+      - AuthorizerLambda
+      - MatrixScriptAPI
+      - APILambdaAuthorizer
+    Properties:
+      Action: lambda:InvokeFunction
+      FunctionName: !FindInMap [Lambda, Function, Auth]
+      Principal: apigateway.amazonaws.com
+      SourceAccount: !Ref AWS::AccountId
+      SourceArn: !Join
+        - ""
+        - - "arn:"
+          - !Ref AWS::Partition
+          - ":execute-api:"
+          - !Ref AWS::Region
+          - ":"
+          - !Ref AWS::AccountId
+          - ":"
+          - !Ref MatrixScriptAPI
+          - "/authorizers/"
+          - !Ref APILambdaAuthorizer
+
+
+  # API Gateway
+  MatrixScriptAPI:
+    Type: AWS::Serverless::HttpApi
+    DependsOn: APIHTTPSCertificate
+    Properties:
+      CorsConfiguration:
+        AllowMethods:
+          - GET
+          - POST
+        AllowOrigins: !FindInMap [APIGateway, API, Origins]
+      Domain:
+        CertificateArn: !Ref APIHTTPSCertificate
+        DomainName: !FindInMap [APIGateway, API, Domain]
+        Route53:
+          HostedZoneId: !FindInMap [APIGateway, HostedZone, Id]
+      Name: !FindInMap [APIGateway, API, Name]
+
+  APILambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    DependsOn:
+      - MatrixScriptAPI
+      - MatrixScriptLambda
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      IntegrationType: AWS_PROXY
+      IntegrationMethod: POST
+      IntegrationUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref AWS::Partition
+          - ":apigateway:"
+          - !Ref AWS::Region
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt MatrixScriptLambda.Arn
+          - /invocations
+      PayloadFormatVersion: 2.0
+
+  APILambdaAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    DependsOn:
+      - MatrixScriptAPI
+      - AuthorizerLambda
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      AuthorizerResultTtlInSeconds: 0
+      AuthorizerPayloadFormatVersion: 2.0
+      AuthorizerType: REQUEST
+      AuthorizerUri: !Join
+        - ""
+        - - "arn:"
+          - !Ref AWS::Partition
+          - ":apigateway:"
+          - !Ref AWS::Region
+          - ":lambda:path/2015-03-31/functions/"
+          - !GetAtt AuthorizerLambda.Arn
+          - /invocations
+      EnableSimpleResponses: true
+      IdentitySource:
+        - "$request.header.Authorization"
+      Name: !FindInMap [APIGateway, API, Auth]
+
+  HealthRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn: APILambdaIntegration
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      RouteKey: GET /health
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APILambdaIntegration
+
+  TokenRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn: APILambdaIntegration
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      RouteKey: POST /token
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APILambdaIntegration
+
+  CommandRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn: APILambdaIntegration
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      RouteKey: POST /
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APILambdaIntegration
+
+  ListSessionsRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn:
+      - APILambdaIntegration
+      - APILambdaAuthorizer
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      RouteKey: GET /private/list-sessions
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref APILambdaAuthorizer
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APILambdaIntegration
+
+  DeleteSessionRoute:
+    Type: AWS::ApiGatewayV2::Route
+    DependsOn:
+      - APILambdaIntegration
+      - APILambdaAuthorizer
+    Properties:
+      ApiId: !Ref MatrixScriptAPI
+      RouteKey: DELETE /private/token/{token}
+      AuthorizationType: CUSTOM
+      AuthorizerId: !Ref APILambdaAuthorizer
+      Target: !Join
+        - /
+        - - integrations
+          - !Ref APILambdaIntegration
+
+  # DynamoDB
+  SessionTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: !FindInMap [DynamoDB, Table, PrimaryKey]
+          AttributeType: S
+      BillingMode: PAY_PER_REQUEST
+      KeySchema:
+        - AttributeName: !FindInMap [DynamoDB, Table, PrimaryKey]
+          KeyType: HASH
+      TableName: !FindInMap [DynamoDB, Table, Name]
+      TimeToLiveSpecification:
+        AttributeName: TTL
+        Enabled: true
+
+  # ACM
+  APIHTTPSCertificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !FindInMap [APIGateway, API, Domain]
+      DomainValidationOptions:
+        - DomainName: !FindInMap [APIGateway, API, Domain]
+          HostedZoneId: !FindInMap [APIGateway, HostedZone, Id]
+      ValidationMethod: DNS
