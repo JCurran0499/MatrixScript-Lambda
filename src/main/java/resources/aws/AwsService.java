@@ -27,10 +27,10 @@ public class AwsService {
 
 
     /* SNS */
-    public static void publish(String topicArn, String command, Exception e) {
+    public static void publish(String topicArn, String command, String message) {
         sns.publish(PublishRequest.builder()
             .topicArn(topicArn)
-            .message(String.format(AwsConstants.ERROR_MESSAGE, command, e.getLocalizedMessage()))
+            .message(String.format(AwsConstants.ERROR_MESSAGE, command, message))
             .subject(AwsConstants.ERROR_SUBJECT)
             .build()
         );
@@ -38,29 +38,43 @@ public class AwsService {
 
 
     /* DynamoDB */
-    public static void addItem(String sessionToken) {
+    public static int addItem(String sessionToken) {
         long ttl = Instant.now().getEpochSecond() + AwsConstants.TTL;
 
         Map<String, AttributeValue> item = new HashMap<>();
         item.put("SessionToken", AttributeValue.builder().s(sessionToken).build());
         item.put("TTL", AttributeValue.builder().n(String.valueOf(ttl)).build());
 
-        dynamodb.putItem(PutItemRequest.builder()
-            .tableName("MatrixScript-Sessions")
-            .item(item)
-            .build()
-        );
+        try {
+            dynamodb.putItem(PutItemRequest.builder()
+                .tableName("MatrixScript-Sessions")
+                .item(item)
+                .conditionExpression("attribute_not_exists(SessionToken)")
+                .build()
+            );
+
+            return 0;
+        } catch (ConditionalCheckFailedException e) {
+            return -1;
+        }
     }
 
-    public static void deleteItem(String sessionToken) {
+    public static int deleteItem(String sessionToken) {
         Map<String, AttributeValue> key = new HashMap<>();
         key.put("SessionToken", AttributeValue.builder().s(sessionToken).build());
 
-        dynamodb.deleteItem(DeleteItemRequest.builder()
-            .tableName("MatrixScript-Sessions")
-            .key(key)
-            .build()
-        );
+        try {
+            dynamodb.deleteItem(DeleteItemRequest.builder()
+                .tableName("MatrixScript-Sessions")
+                .key(key)
+                .conditionExpression("attribute_exists(SessionToken)")
+                .build()
+            );
+
+            return 0;
+        } catch (ConditionalCheckFailedException e) {
+            return -1;
+        }
     }
 
     public static boolean itemExists(String sessionToken) {
@@ -87,8 +101,6 @@ public class AwsService {
     }
 
     public static Primitive getAttribute(String sessionToken, String attribute) {
-        long now = Instant.now().getEpochSecond();
-
         Map<String, AttributeValue> key = new HashMap<>();
         key.put("SessionToken", AttributeValue.builder().s(sessionToken).build());
 
@@ -103,7 +115,7 @@ public class AwsService {
             .build()
         );
 
-        if (!resp.hasItem())
+        if (!resp.hasItem() || !resp.item().containsKey(attribute))
             return null;
 
         return SerializationUtils.deserialize(resp.item().get(attribute).b().asByteArray());

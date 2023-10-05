@@ -29,8 +29,7 @@ public class MatrixScript implements RequestStreamHandler {
                 : null;
 
             String path = json.get("routeKey").textValue();
-            Payload payload = new Payload(json.get("headers"), json.get("queryStringParameters"),
-                json.get("pathParameters"), body);
+            Payload payload = new Payload(json.get("queryStringParameters"), json.get("pathParameters"), body);
 
             Response resp = Api.run(path, payload);
             mapper.writeValue(out, resp);

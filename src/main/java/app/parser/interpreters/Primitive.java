@@ -4,8 +4,6 @@ import java.io.Serializable;
 
 public abstract class Primitive implements Interpreter, Serializable {
 
-    public boolean printValue = true;
-
     public Primitive solve() {
         return this;
     }

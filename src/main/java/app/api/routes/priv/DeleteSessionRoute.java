@@ -5,9 +5,7 @@ import app.api.Response;
 import app.api.Route;
 import app.api.responses.ErrorResponse;
 import app.api.responses.TokenResponse;
-import app.parser.interpreters.variables.SessionHandler;
-
-import java.util.UUID;
+import resources.aws.AwsService;
 
 public class DeleteSessionRoute implements Route {
 
@@ -19,8 +17,11 @@ public class DeleteSessionRoute implements Route {
     }
 
     public Response execute(Payload req) {
-        String sessionToken = req.path().get("token").textValue();
-        int success = SessionHandler.invalidateSession(sessionToken);
+        String sessionToken = Payload.retrieveText(req.path(), "token");
+        if (sessionToken == null)
+            return new ErrorResponse("invalid payload format").resp(400);
+
+        int success = AwsService.deleteItem(sessionToken);
         if (success == -1)
             return new ErrorResponse("invalid token").resp(404);
 

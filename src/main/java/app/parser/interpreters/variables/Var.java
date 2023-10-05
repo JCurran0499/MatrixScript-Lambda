@@ -3,6 +3,7 @@ package app.parser.interpreters.variables;
 import app.parser.interpreters.Interpreter;
 import app.parser.interpreters.Primitive;
 import app.parser.interpreters.primitives.Err;
+import resources.aws.AwsService;
 
 public class Var implements Interpreter {
 
@@ -17,7 +18,7 @@ public class Var implements Interpreter {
     /* Base Methods */
 
     public Primitive solve() {
-        Primitive p = SessionHandler.getVar(token, name);
+        Primitive p = AwsService.getAttribute(token, name);
         if (p == null)
             return new Err("variable '" + name + "' does not exist");
 

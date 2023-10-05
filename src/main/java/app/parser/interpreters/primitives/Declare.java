@@ -1,26 +1,25 @@
-package app.parser.interpreters.interpreters.commands;
+package app.parser.interpreters.primitives;
 
 import app.parser.interpreters.Interpreter;
 import app.parser.interpreters.Primitive;
-import app.parser.interpreters.primitives.Err;
-import app.parser.interpreters.primitives.Null;
-import app.parser.interpreters.variables.SessionHandler;
 import app.parser.Token;
+import app.parser.interpreters.PrimitiveID;
+import resources.aws.AwsService;
 
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class Declare implements Interpreter {
+public class Declare extends Primitive {
 
     private final String token;
     private final String varName;
-    private final Interpreter expression;
+    private final Primitive value;
 
 
     public Declare(String t, String v, Interpreter e) {
         token = t;
         varName = v;
-        expression = e;
+        value = e.solve();
     }
 
     /* Base Methods */
@@ -29,23 +28,35 @@ public class Declare implements Interpreter {
         if (!isValidVariable(varName))
             return new Err("invalid variable name");
 
-        Primitive p = expression.solve();
-
-        if (Err.is(p))
-            return p;
-        if (Null.is(p))
+        if (Err.is(value))
+            return value;
+        if (Null.is(value))
             return new Err("variable '" + varName + "' must be set to a value");
 
-        p.printValue = false;
+        addVariable(varName, value);
+        return this;
+    }
 
-        addVariable(varName, p);
-        return p;
+    public String id() {
+        return PrimitiveID.DECLARE.name;
+    }
+
+    public String string() {
+        return value.string();
+    }
+
+    public boolean equals(Primitive p) {
+        return value.equals(p);
     }
 
 
     /* Logic Methods */
     public void addVariable(String varName, Primitive value) {
-        SessionHandler.setVar(token, varName, value);
+        AwsService.putAttribute(token, varName, value);
+    }
+
+    public static boolean is(Primitive p) {
+    return p.id().equals(PrimitiveID.DECLARE.name);
     }
 
     private static boolean isValidVariable(String name) {

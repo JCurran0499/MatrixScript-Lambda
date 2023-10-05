@@ -8,6 +8,7 @@ public enum PrimitiveID {
     NUM("num"),
     RANGE("range"),
     TUPLE("tuple"),
+    DECLARE("declare"),
     FUNCTION("function");
 
     public final String name;

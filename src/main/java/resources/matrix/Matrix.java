@@ -22,6 +22,7 @@ import resources.matrix.exceptions.MatrixNullException;
 import resources.matrix.exceptions.MatrixOutOfBoundsException;
 import resources.matrix.exceptions.MatrixStringException;
 
+import java.io.Serializable;
 import java.lang.reflect.Array;
 import java.util.Optional;
 import java.math.BigDecimal;
@@ -29,7 +30,7 @@ import java.math.MathContext;
 import java.math.RoundingMode;
 import java.util.Arrays;
 
-public class Matrix {
+public class Matrix implements Serializable {
 	
 	//represents the matrix, with each array within the array representing a row
 	private final BigDecimal[][] matrix;
