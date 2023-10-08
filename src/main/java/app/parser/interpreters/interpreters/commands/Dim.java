@@ -8,7 +8,6 @@ import app.parser.interpreters.primitives.Mat;
 import app.parser.interpreters.primitives.Num;
 import app.parser.interpreters.primitives.Tuple;
 import java.math.BigDecimal;
-import java.util.Arrays;
 
 public class Dim implements Interpreter {
 

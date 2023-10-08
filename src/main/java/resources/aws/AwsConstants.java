@@ -15,4 +15,6 @@ public class AwsConstants {
     private static final int HOUR = 60 * MINUTE;
 
     public static final int TTL = 24 * HOUR;
+
+    public static final String ENDPOINT = System.getenv("ENDPOINT");
 }

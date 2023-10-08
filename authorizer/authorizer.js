@@ -3,7 +3,7 @@ import { SSMClient, GetParameterCommand } from "@aws-sdk/client-ssm"
 const ssm = new SSMClient()
 const ssm_command = new GetParameterCommand(
     {
-        Name: "matrixscript_private_endpoint_key",
+        Name: process.env.SECRET_NAME,
         WithDecryption: true
     }
 )

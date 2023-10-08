@@ -44,6 +44,6 @@ public class ListSessionsRoute implements Route {
 
     public record Session (
         @NonNull String sessionToken,
-        @NonNull long expiration
+        long expiration
     ) {}
 }

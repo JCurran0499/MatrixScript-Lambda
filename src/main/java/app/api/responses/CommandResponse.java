@@ -5,6 +5,7 @@ import lombok.*;
 
 @Getter
 @AllArgsConstructor
+@RequiredArgsConstructor
 public class CommandResponse {
     private @NonNull String status;
     private String response;
@@ -12,6 +13,6 @@ public class CommandResponse {
     private String errMessage;
 
     public Response resp() {
-        return new Response(201, this);
+        return new Response(200, this);
     }
 }

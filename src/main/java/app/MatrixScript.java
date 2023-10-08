@@ -22,25 +22,15 @@ public class MatrixScript implements RequestStreamHandler {
     public void handleRequest(InputStream in, OutputStream out, Context context) throws IOException {
         mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
-        try {
-            JsonNode json = mapper.readTree(in);
-            JsonNode body = (json.has("body"))
-                ? mapper.readTree(json.get("body").asText())
-                : null;
+        JsonNode json = mapper.readTree(in);
+        JsonNode body = (json.has("body"))
+            ? mapper.readTree(json.get("body").asText())
+            : null;
 
-            String path = json.get("routeKey").textValue();
-            Payload payload = new Payload(json.get("queryStringParameters"), json.get("pathParameters"), body);
+        String path = json.get("routeKey").textValue();
+        Payload payload = new Payload(json.get("queryStringParameters"), json.get("pathParameters"), body);
 
-            Response resp = Api.run(path, payload);
-            mapper.writeValue(out, resp);
-
-        } catch (Exception e) {
-            mapper.writeValue(out, new Cause(e.getMessage(), e.getStackTrace()));
-        }
+        Response resp = Api.run(path, payload);
+        mapper.writeValue(out, resp);
     }
-
-    public record Cause (
-        String message,
-        StackTraceElement[] stack
-    ) {}
 }

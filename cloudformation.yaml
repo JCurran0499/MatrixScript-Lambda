@@ -18,8 +18,7 @@ Mappings:
     API:
       Name: MatrixScript
       Domain: serverless.api.matrixscript.net
-      Origins:
-        - "*"
+      Origin: https://matrixscript.net
       Auth: auth
 
     HostedZone:
@@ -73,6 +72,42 @@ Resources:
       CodeUri: target/MatrixScript-2.0-jar-with-dependencies.jar
       FunctionName: !FindInMap [Lambda, Function, Name]
       Handler: app.MatrixScript::handleRequest
+      Environment:
+        Variables:
+          SNS_TOPIC: arn:aws:sns:us-east-1:298451523862:MatrixScript-Failures-SNS
+          TABLE_NAME: MatrixScript-Sessions
+          ENDPOINT: ""
+      Events:
+        HealthEvent:
+          Type: HttpApi
+          Properties:
+            Method: get
+            Path: /health
+            PayloadFormatVersion: "2.0"
+        CommandEvent:
+          Type: HttpApi
+          Properties:
+            Method: post
+            Path: /
+            PayloadFormatVersion: "2.0"
+        TokenEvent:
+          Type: HttpApi
+          Properties:
+            Method: post
+            Path: /token
+            PayloadFormatVersion: "2.0"
+        ListSessionsEvent:
+          Type: HttpApi
+          Properties:
+            Method: get
+            Path: /private/list-sessions
+            PayloadFormatVersion: "2.0"
+        DeleteSessionEvent:
+          Type: HttpApi
+          Properties:
+            Method: delete
+            Path: /private/token/{token}
+            PayloadFormatVersion: "2.0"
       MemorySize: 2048
       Role: !GetAtt LambdaExecutionRole.Arn
       Runtime: java17
@@ -89,6 +124,9 @@ Resources:
       CodeUri: authorizer/authorizer.zip
       FunctionName: !FindInMap [Lambda, Function, Auth]
       Handler: authorizer.handler
+      Environment:
+        Variables:
+          SECRET_NAME: matrixscript_private_endpoint_key
       Role: !GetAtt AuthorizerExecutionRole.Arn
       Runtime: nodejs18.x
       Timeout: 5
@@ -149,7 +187,11 @@ Resources:
         AllowMethods:
           - GET
           - POST
-        AllowOrigins: !FindInMap [APIGateway, API, Origins]
+        AllowOrigins:
+          - !FindInMap [APIGateway, API, Origin]
+        AllowHeaders:
+          - "Content-Type"
+        AllowCredentials: true
       Domain:
         CertificateArn: !Ref APIHTTPSCertificate
         DomainName: !FindInMap [APIGateway, API, Domain]

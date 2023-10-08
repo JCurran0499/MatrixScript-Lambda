@@ -13,8 +13,8 @@ import java.util.Map;
 public class Response {
     private static final ObjectMapper mapper = new ObjectMapper();
 
-    private @NonNull int statusCode;
-    private @NonNull Map<String, String> headers = new HashMap<>();
+    private final int statusCode;
+    private final @NonNull Map<String, String> headers = new HashMap<>();
     private String body;
 
     public Response(int status, Object data) {

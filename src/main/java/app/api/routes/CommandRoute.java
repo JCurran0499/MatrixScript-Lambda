@@ -35,8 +35,13 @@ public class CommandRoute implements Route {
         if (command.contains("//"))
             command = command.substring(0, command.indexOf("//")).stripTrailing();
 
-        Primitive result = Parser.parse(sessionToken, command).solve();
-        return jsonValue(result).resp();
+        try {
+            Primitive result = Parser.parse(sessionToken, command).solve();
+            return jsonValue(result).resp();
+        } catch (Exception e) {
+            AwsService.publish(System.getenv("SNS_TOPIC"), command, e.getLocalizedMessage());
+            return new ErrorResponse("unexpected internal server error").resp(500);
+        }
     }
 
     private CommandResponse jsonValue(Primitive result) {

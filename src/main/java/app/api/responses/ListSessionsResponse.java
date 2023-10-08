@@ -3,13 +3,13 @@ package app.api.responses;
 import app.api.Response;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
+import lombok.AllArgsConstructor;
 
 
 @Getter
-@RequiredArgsConstructor
+@AllArgsConstructor
 public class ListSessionsResponse {
-    private @NonNull int sessionCount;
+    private int sessionCount;
     private @NonNull SessionJson[] sessions;
 
     public record SessionJson(

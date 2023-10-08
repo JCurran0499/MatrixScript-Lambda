@@ -2,6 +2,7 @@ package resources.aws;
 
 import app.parser.interpreters.Primitive;
 import org.apache.commons.lang3.SerializationUtils;
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
@@ -9,6 +10,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
 import software.amazon.awssdk.regions.Region;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -17,13 +19,20 @@ import java.util.Map;
 
 public class AwsService {
 
+
+
     private static final SnsClient sns = SnsClient.builder()
         .region(Region.US_EAST_1)
         .build();
 
-    private static final DynamoDbClient dynamodb = DynamoDbClient.builder()
-        .region(Region.US_EAST_1)
-        .build();
+    private static final DynamoDbClient dynamodb = (!AwsConstants.ENDPOINT.isEmpty())
+        ? DynamoDbClient.builder()
+            .region(Region.US_EAST_1)
+            .endpointOverride(URI.create(System.getenv("ENDPOINT")))
+            .build()
+        : DynamoDbClient.builder()
+            .region(Region.US_EAST_1)
+            .build();
 
 
     /* SNS */
@@ -47,7 +56,7 @@ public class AwsService {
 
         try {
             dynamodb.putItem(PutItemRequest.builder()
-                .tableName("MatrixScript-Sessions")
+                .tableName(System.getenv("TABLE_NAME"))
                 .item(item)
                 .conditionExpression("attribute_not_exists(SessionToken)")
                 .build()
@@ -65,7 +74,7 @@ public class AwsService {
 
         try {
             dynamodb.deleteItem(DeleteItemRequest.builder()
-                .tableName("MatrixScript-Sessions")
+                .tableName(System.getenv("TABLE_NAME"))
                 .key(key)
                 .conditionExpression("attribute_exists(SessionToken)")
                 .build()
@@ -87,17 +96,14 @@ public class AwsService {
         k.put("#k", "TTL");
 
         GetItemResponse resp = dynamodb.getItem(GetItemRequest.builder()
-            .tableName("MatrixScript-Sessions")
+            .tableName(System.getenv("TABLE_NAME"))
             .key(key)
             .projectionExpression("SessionToken,#k")
             .expressionAttributeNames(k)
             .build()
         );
 
-        if (!resp.hasItem() || Long.valueOf(resp.item().get("TTL").n()) < now)
-            return false;
-
-        return true;
+        return resp.hasItem() && Long.parseLong(resp.item().get("TTL").n()) >= now;
     }
 
     public static Primitive getAttribute(String sessionToken, String attribute) {
@@ -108,7 +114,7 @@ public class AwsService {
         a.put("#a", attribute);
 
         GetItemResponse resp = dynamodb.getItem(GetItemRequest.builder()
-            .tableName("MatrixScript-Sessions")
+            .tableName(System.getenv("TABLE_NAME"))
             .key(key)
             .projectionExpression("#a")
             .expressionAttributeNames(a)
@@ -131,7 +137,7 @@ public class AwsService {
         v.put(":v", AttributeValue.builder().n(String.valueOf(now)).build());
 
         ScanResponse resp = dynamodb.scan(ScanRequest.builder()
-            .tableName("MatrixScript-Sessions")
+            .tableName(System.getenv("TABLE_NAME"))
             .select("SPECIFIC_ATTRIBUTES")
             .projectionExpression("SessionToken,#k")
             .filterExpression("#k > :v")
@@ -168,7 +174,7 @@ public class AwsService {
         v.put(":v", AttributeValue.builder().b(SdkBytes.fromByteArray(bytes)).build());
 
         dynamodb.updateItem(UpdateItemRequest.builder()
-            .tableName("MatrixScript-Sessions")
+            .tableName(System.getenv("TABLE_NAME"))
             .key(key)
             .updateExpression("SET #k = :v")
             .expressionAttributeNames(k)
