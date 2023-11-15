@@ -1,0 +1,20 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /health",
+  "rawPath": "/health",
+  "headers": {
+    "accept": "*/*",
+    "accept-encoding": "gzip, deflate, br",
+    "x-forwarded-proto": "https"
+  },
+  "requestContext": {
+    "http": {
+      "method": "GET",
+      "path": "/health",
+      "protocol": "HTTP/1.1"
+    },
+    "routeKey": "GET /health",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

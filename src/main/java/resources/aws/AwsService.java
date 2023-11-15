@@ -2,7 +2,6 @@ package resources.aws;
 
 import app.parser.interpreters.Primitive;
 import org.apache.commons.lang3.SerializationUtils;
-import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider;
 import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.PublishRequest;

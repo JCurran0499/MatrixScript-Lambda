@@ -4,7 +4,6 @@ package app.api.responses;
 import app.api.Response;
 import lombok.*;
 
-
 @Getter
 @AllArgsConstructor
 @RequiredArgsConstructor
